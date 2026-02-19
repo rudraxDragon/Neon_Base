@@ -16,20 +16,27 @@ const SignUp = () => {
 
   const handleInitSubmit = async () => {
     setLoading(true);
-    const { error } = await client.auth.emailOtp.sendVerificationOtp({
+    const result = await client.auth.signUp.email({
       email: email,
-      type: "email-verification",
+      password: password,
+      name: email,
     });
-    if (error) {
-      console.log("error during otp verification : ", error);
-      return;
+
+    if (result.error) {
+      console.log("ah man ... error log: ", result.error.message);
     } else {
-      setShowOtp(true);
+      if (result.data?.user && !result.data.user.emailVerified) {
+        setShowOtp(true); // code already sent by Neon
+      }
     }
     setLoading(false);
   };
 
   const handleOtpVerify = async () => {
+    if (!email || !password) {
+      console.log("add all feilds before you verify");
+      return;
+    }
     const { data, error } = await client.auth.emailOtp.verifyEmail({
       email: email,
       otp: otp,
@@ -37,19 +44,10 @@ const SignUp = () => {
 
     if (error) {
       console.log("otp verification failed , log : ", error);
+    } else {
+      await refreshSession();
+      navigate("/Profile");
     }
-
-    const result = await client.auth.signUp.email({
-      email: email,
-      password: password,
-      name: email,
-    });
-    if (result.error) {
-      console.log("signup error: ", result.error);
-      return;
-    }
-    await refreshSession();
-    navigate("/Profile");
   };
 
   const renderOtpRegion = () => {
