@@ -120,9 +120,16 @@ Under **Authorized redirect URIs**, add the URL your app redirects to after sign
 
 Copy the **Client ID** and **Client Secret** from the Google console.
 
-#### 3. Add Google as a provider in Neon
+#### 3. Add your credentials to the project
 
-In your Neon dashboard → **Auth** tab → **Social Providers** → enable **Google** → paste in your Client ID and Client Secret → save.
+Add your Google Client ID and Client Secret to your `.env.local`:
+
+```
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
+VITE_GOOGLE_CLIENT_SECRET=your_google_client_secret
+```
+
+Then pass them into your Neon client config in `src/lib/client.jsx` according to your Neon version's auth configuration.
 
 ---
 
@@ -138,9 +145,16 @@ Under **Authorized Redirect URIs**, add the URL your app redirects to after sign
 
 Copy the **Client ID** and **Client Secret** from the Zoho API console.
 
-#### 3. Add Zoho as a provider in Neon
+#### 3. Add your credentials to the project
 
-In your Neon dashboard → **Auth** tab → **Social Providers** → enable **Zoho** → paste in your Client ID and Client Secret → save.
+Add your Zoho Client ID and Client Secret to your `.env.local`:
+
+```
+VITE_ZOHO_CLIENT_ID=your_zoho_client_id
+VITE_ZOHO_CLIENT_SECRET=your_zoho_client_secret
+```
+
+Then pass them into your Neon client config in `src/lib/client.jsx` according to your Neon version's auth configuration.
 
 ---
 
