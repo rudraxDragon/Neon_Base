@@ -1,6 +1,6 @@
 # React + Neon Auth Starter
 
-A minimal authentication boilerplate built with React and Neon's auth platform. Includes email/password sign up, OTP email verification, Google and Zoho OAuth, protected routes, and persistent session management.
+A minimal authentication boilerplate built with React and Neon's auth platform. Includes email/password sign up, OTP email verification, Google OAuth, protected routes, profile creation, and persistent session management.
 
 ## Stack
 
@@ -12,8 +12,9 @@ A minimal authentication boilerplate built with React and Neon's auth platform. 
 
 - Email + password sign up with OTP email verification
 - Email OTP login (two-step)
-- Google and Zoho OAuth (one-click sign in)
+- Google OAuth (one-click sign in)
 - Protected routes
+- Profile creation flow for new users
 - Persistent sessions across page refreshes
 - Single source of truth for auth state via React Context
 - Loading spinner while session is being resolved
@@ -40,12 +41,16 @@ A minimal authentication boilerplate built with React and Neon's auth platform. 
 │   │   ├── Auth.jsx
 │   │   ├── AuthContext.jsx
 │   │   ├── AuthProvider.jsx
+│   │   ├── CheckRegistration.jsx
 │   │   ├── client.jsx
 │   │   └── ProtectedRoutes.jsx
 │   ├── login
 │   │   ├── Login.css
 │   │   └── Login.jsx
 │   ├── main.jsx
+│   ├── makeProfile
+│   │   ├── Profile.css
+│   │   └── Profile.jsx
 │   └── signUp
 │       ├── SignUp.css
 │       └── SignUp.jsx
@@ -70,128 +75,52 @@ In the Auth tab → Authentication Methods → enable **Email OTP**. This is req
 
 ### 4. Enable Data API
 
-In your project dashboard go to the **Data API** tab → Enable Data API. This lets you query your Neon database directly from the frontend using `client.dataApi`.
+In your project dashboard go to the **Data API** tab → Enable Data API. This lets you query your Neon database directly from the frontend using the Neon client.
 
-Once enabled you can query your database like this:
+### 5. Create the users table
 
-```jsx
-const result = await client.dataApi.query(
-  "SELECT * FROM your_table WHERE user_id = $1",
-  [user.id],
+The profile flow writes to a `users` table. Run this in your Neon SQL editor:
+
+```sql
+CREATE TABLE users (
+  user_id TEXT PRIMARY KEY,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL
 );
 ```
 
-### 5. Get your environment variables
+### 6. Get your environment variables
 
 - **Auth URL** → found in the **Auth** tab → this is your `VITE_NEON_AUTH`
 - **Data API URL** → found in the **Data API** tab → this is your `VITE_NEON_DATA_API`
 
 ---
 
-## OAuth Setup
+## Google OAuth Setup
 
-The project includes OAuth support for Google and Zoho out of the box. Both providers follow the same setup pattern.
+Google OAuth works in development with no configuration — Neon provides shared credentials out of the box. For production you'll want to set up your own credentials.
+
+### Production setup
+
+Go to [console.cloud.google.com](https://console.cloud.google.com) → create a project → **APIs & Services** → **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**.
+
+Set the application type to **Web application**. Under **Authorized redirect URIs**, add your app's domain — this is whatever you set as `callbackURL` in `Login.jsx` and `SignUp.jsx`.
+
+In your Neon dashboard → **Settings** → **Auth**, add your Google Client ID and Client Secret.
 
 ### Callback URL
 
-The `callbackURL` in `Login.jsx` and `SignUp.jsx` is set to a placeholder:
+The `callbackURL` in `Login.jsx` and `SignUp.jsx` controls where Neon redirects the user after OAuth completes. Update it to match your domain before deploying:
 
 ```jsx
-callbackURL: "https://yourapp.com/auth/callback";
+callbackURL: "https://yourapp.com/Home";
 ```
 
-Update this to your actual domain in both files before deploying. In development you can use `http://localhost:5173/auth/callback` or wherever your dev server runs.
+In development it points to `http://localhost:5173/Home` by default.
 
----
+### How it works
 
-### Google OAuth
-
-#### 1. Create a Google OAuth app
-
-Go to [console.cloud.google.com](https://console.cloud.google.com) → create a new project or select an existing one.
-
-Navigate to **APIs & Services** → **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**.
-
-Set the application type to **Web application**.
-
-Under **Authorized redirect URIs**, add the URL your app redirects to after sign in — this is whatever you set as `callbackURL` in `Login.jsx` and `SignUp.jsx`. In development this is typically `http://localhost:5173/auth/callback`.
-
-#### 2. Get your credentials
-
-Copy the **Client ID** and **Client Secret** from the Google console.
-
-#### 3. Add your credentials to the project
-
-Add your Google Client ID and Client Secret to your `.env.local`:
-
-```
-VITE_GOOGLE_CLIENT_ID=your_google_client_id
-VITE_GOOGLE_CLIENT_SECRET=your_google_client_secret
-```
-
-Then pass them into your Neon client config in `src/lib/client.jsx` according to your Neon version's auth configuration.
-
----
-
-### Zoho OAuth
-
-#### 1. Create a Zoho OAuth app
-
-Go to [api-console.zoho.com](https://api-console.zoho.com) → **Add Client** → select **Server-based Applications**.
-
-Under **Authorized Redirect URIs**, add the URL your app redirects to after sign in — this is whatever you set as `callbackURL` in `Login.jsx` and `SignUp.jsx`. In development this is typically `http://localhost:5173/auth/callback`.
-
-#### 2. Get your credentials
-
-Copy the **Client ID** and **Client Secret** from the Zoho API console.
-
-#### 3. Add your credentials to the project
-
-Add your Zoho Client ID and Client Secret to your `.env.local`:
-
-```
-VITE_ZOHO_CLIENT_ID=your_zoho_client_id
-VITE_ZOHO_CLIENT_SECRET=your_zoho_client_secret
-```
-
-Then pass them into your Neon client config in `src/lib/client.jsx` according to your Neon version's auth configuration.
-
----
-
-### How OAuth works in this project
-
-When a user clicks **Sign in with Google** or **Sign in with Zoho**, Neon handles the full OAuth redirect flow. On success, Neon redirects the user back to your `callbackURL`. You need to handle that route in your app, call `refreshSession()`, and navigate the user to the appropriate page.
-
-A minimal callback handler looks like this:
-
-```jsx
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../lib/AuthContext.jsx";
-
-const AuthCallback = () => {
-  const { refreshSession } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const finish = async () => {
-      await refreshSession();
-      navigate("/Home");
-    };
-    finish();
-  }, []);
-
-  return <p>Signing you in...</p>;
-};
-
-export default AuthCallback;
-```
-
-Register this component as a route in `App.jsx` at whatever path you set as your `callbackURL`:
-
-```jsx
-<Route path="/auth/callback" element={<AuthCallback />} />
-```
+When a user clicks **Continue with Google**, Neon handles the full OAuth redirect flow. On success Neon redirects back to your `callbackURL` with an active session already created. `RootRedirect` then runs the registration check and routes the user to `/Profile` or `/Home` accordingly.
 
 ---
 
@@ -219,15 +148,7 @@ VITE_NEON_AUTH=your_neon_auth_url
 VITE_NEON_DATA_API=your_neon_data_api_url
 ```
 
-### 4. Update OAuth callback URLs
-
-In `src/login/Login.jsx` and `src/signUp/SignUp.jsx`, replace the placeholder `callbackURL` with your actual URL:
-
-```jsx
-callbackURL: "https://yourapp.com/auth/callback";
-```
-
-### 5. Run the dev server
+### 4. Run the dev server
 
 ```bash
 npm run dev
@@ -242,16 +163,14 @@ npm run dev
 Two separate clients are used. `Auth.jsx` is a lightweight auth-only client used by `AuthProvider` to check sessions:
 
 ```jsx
-// src/lib/Auth.jsx
 import { createAuthClient } from "@neondatabase/neon-js/auth";
 
 export const authClient = createAuthClient(import.meta.env.VITE_NEON_AUTH);
 ```
 
-`client.jsx` is the full Neon client used in Login, SignUp, and Home for auth actions and future data queries:
+`client.jsx` is the full Neon client used everywhere else for auth actions and database queries:
 
 ```jsx
-// src/lib/client.jsx
 import { createClient } from "@neondatabase/neon-js";
 
 const client = createClient({
@@ -269,7 +188,6 @@ export default client;
 `AuthContext.jsx` creates the context and exports a `useAuth` hook so any component can read auth state without importing `useContext` and `AuthContext` separately:
 
 ```jsx
-// src/lib/AuthContext.jsx
 import { createContext, useContext } from "react";
 
 export const AuthContext = createContext(null);
@@ -280,10 +198,9 @@ export const useAuth = () => useContext(AuthContext);
 
 ### AuthProvider — Single Source of Truth
 
-`AuthProvider` fetches the session once on mount and exposes `refreshSession` to any component that needs to sync state after a login or logout. Nothing outside this file directly sets session or user:
+`AuthProvider` fetches the session once on mount and exposes `refreshSession` to any component that needs to sync state after a login or logout:
 
 ```jsx
-// src/lib/AuthProvider.jsx
 const refreshSession = useCallback(async () => {
   const result = await authClient.getSession();
   if (result.data?.session && result.data?.user) {
@@ -294,22 +211,11 @@ const refreshSession = useCallback(async () => {
     setUser(null);
   }
 }, []);
-
-useEffect(() => {
-  const init = async () => {
-    try {
-      await refreshSession();
-    } finally {
-      setLoading(false);
-    }
-  };
-  init();
-}, [refreshSession]);
 ```
 
 While loading, a spinner is shown so protected routes never render before the session is resolved.
 
-The context value exposes:
+The context exposes:
 
 ```jsx
 <AuthContext.Provider value={{ user, session, refreshSession }}>
@@ -319,10 +225,9 @@ The context value exposes:
 
 ### Protected Routes
 
-`ProtectedRoutes` reads from context. By the time it renders, `AuthProvider` has already resolved the session so no extra loading logic is needed here:
+`ProtectedRoutes` reads from context. By the time it renders, `AuthProvider` has already resolved the session so no extra loading logic is needed:
 
 ```jsx
-// src/lib/ProtectedRoutes.jsx
 const ProtectedRoutes = ({ children }) => {
   const { session } = useAuth();
 
@@ -331,48 +236,48 @@ const ProtectedRoutes = ({ children }) => {
 };
 ```
 
-Wrap any route you want to protect in `App.jsx`:
-
-```jsx
-<Route
-  path="/Dashboard"
-  element={
-    <ProtectedRoutes>
-      <Dashboard />
-    </ProtectedRoutes>
-  }
-/>
-```
-
 ---
 
-### Root Redirect
+### Root Redirect and Registration Check
 
-The root `/` route checks the session and redirects accordingly:
+The root `/` route checks both the session and whether the user has completed profile setup. `CheckRegistration` queries the `users` table to see if a row exists for the current user:
 
 ```jsx
-// src/App.jsx
 const RootRedirect = () => {
-  const { session } = useAuth();
-  return <Navigate to={session ? "/Home" : "/Login"} replace />;
+  const { session, user } = useAuth();
+  const [isRegistered, setIsRegistered] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    checkRegistration(user.id).then((e) => setIsRegistered(e));
+  }, [user, session]);
+
+  if (!session) return <Navigate to="/Login" />;
+  if (isRegistered === null) return null;
+  return <Navigate to={isRegistered ? "/Home" : "/Profile"} />;
 };
 ```
 
+This means any user — whether they signed up via email or Google OAuth — is routed to `/Profile` first if they haven't created their profile yet, and to `/Home` if they have.
+
 ---
 
-### Login and Sign Up — calling refreshSession
+### Profile Flow
 
-After a successful OTP verification, call `refreshSession()` before navigating. This syncs the context with the active session:
+`Profile.jsx` is a one-time setup page where new users enter their first and last name. On submit it inserts a row into the `users` table and navigates to `/Home`. Once that row exists, `CheckRegistration` returns `true` and the user will never be routed to `/Profile` again.
+
+---
+
+### refreshSession after Auth Actions
+
+After any action that creates or ends a session, call `refreshSession()` before navigating to sync the context:
 
 ```jsx
-const { refreshSession } = useAuth();
-
-// after OTP verified:
 await refreshSession();
 navigate("/Home");
 ```
 
-Same pattern on sign out:
+On sign out:
 
 ```jsx
 await client.auth.signOut();
@@ -387,24 +292,25 @@ navigate("/Login");
 **Sign Up**
 
 1. User enters email and password
-2. Account is created via `client.auth.signUp.email()`
-3. OTP sent to email via `client.auth.emailOtp.sendVerificationOtp()`
-4. User enters OTP → verified via `client.auth.emailOtp.verifyEmail()`
-5. `refreshSession()` called → session stored in context → redirect to Home
+2. Account created via `client.auth.signUp.email()`
+3. OTP sent to email automatically by Neon
+4. User enters the 6-digit code → verified via `client.auth.emailOtp.verifyEmail()`
+5. `refreshSession()` called → redirect to `/Profile`
+6. User enters first and last name → row inserted into `users` table → redirect to `/Home`
 
 **Login**
 
 1. User enters email and password → `client.auth.signIn.email()`
 2. OTP sent to email via `client.auth.emailOtp.sendVerificationOtp()`
-3. User enters OTP → verified via `client.auth.signIn.emailOtp()`
-4. `refreshSession()` called → session stored in context → redirect to Home
+3. User enters the 6-digit code → verified via `client.auth.signIn.emailOtp()`
+4. `refreshSession()` called → `CheckRegistration` runs → redirect to `/Profile` or `/Home`
 
-**OAuth (Google / Zoho)**
+**Google OAuth**
 
-1. User clicks Sign in with Google or Sign in with Zoho
-2. Neon redirects the user to the provider's consent screen
-3. On approval, the provider redirects back to your `callbackURL`
-4. Your callback route calls `refreshSession()` → session stored in context → redirect to Home
+1. User clicks Continue with Google
+2. Neon redirects to Google's consent screen
+3. On approval, Google redirects back to your `callbackURL` with an active session
+4. `RootRedirect` runs `CheckRegistration` → redirect to `/Profile` or `/Home`
 
 **On Page Refresh**
 
@@ -419,7 +325,6 @@ navigate("/Login");
 **Add a new protected route**
 
 ```jsx
-// App.jsx
 import Dashboard from "./dashboard/Dashboard.jsx";
 
 <Route
@@ -450,8 +355,8 @@ import { useAuth } from "../lib/AuthContext.jsx";
 
 const { user } = useAuth();
 
-const result = await client.dataApi.query(
-  "SELECT * FROM posts WHERE user_id = $1",
-  [user.id],
-);
+const { data, error } = await client
+  .from("your_table")
+  .select("*")
+  .eq("user_id", user.id);
 ```

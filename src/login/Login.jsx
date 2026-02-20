@@ -100,13 +100,6 @@ const Login = () => {
     });
   };
 
-  const Zoho_OAuth = async () => {
-    await client.auth.signIn.social({
-      provider: "zoho",
-      callbackURL: "https://yourapp.com/auth/callback",
-    });
-  };
-
   const resendOtp = async () => {
     const { error } = await client.auth.emailOtp.sendVerificationOtp({
       email: email,
@@ -127,9 +120,6 @@ const Login = () => {
           <div className="oauth_group">
             <button type="button" className="oauth_btn" onClick={Google_OAuth}>
               Sign in with Google
-            </button>
-            <button type="button" className="oauth_btn" onClick={Zoho_OAuth}>
-              Sign in with Zoho
             </button>
           </div>
 
