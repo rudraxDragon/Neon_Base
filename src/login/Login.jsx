@@ -16,9 +16,10 @@ const Login = () => {
   const navigate = useNavigate();
 
   const handleInitSubmit = async () => {
+    setError("");
     setLoading(true);
     if (!email || !password) {
-      setError("All feilds are mandetory");
+      setError("All fields are mandatory");
       setLoading(false);
       return;
     }
@@ -49,11 +50,12 @@ const Login = () => {
     });
 
     if (error) {
-      setError("error in sending otp, log: ", error);
+      setError(`Error sending OTP: ${error.message ?? error}`);
     }
   };
 
   const handleOTPSubmit = async () => {
+    setError("");
     if (!otp) {
       setError("Please enter your OTP");
       return;
@@ -76,58 +78,92 @@ const Login = () => {
     return (
       <div className="otp_section">
         <input
-          placeholder="Enter Otp"
-          className="opt_input"
+          placeholder="Enter OTP"
+          className="otp_input"
           value={otp}
           onChange={(e) => setOtp(e.target.value)}
         />
-        <button type="submit" className="otp_btn" onClick={handleOTPSubmit}>
+        <button type="button" className="otp_btn" onClick={handleOTPSubmit}>
           Verify
+        </button>
+        <button type="button" className="otp_resend" onClick={resendOtp}>
+          Resend OTP
         </button>
       </div>
     );
+  };
+
+  const Google_OAuth = async () => {
+    await client.auth.signIn.social({
+      provider: "google",
+      callbackURL: "https://yourapp.com/auth/callback",
+    });
+  };
+
+  const Zoho_OAuth = async () => {
+    await client.auth.signIn.social({
+      provider: "zoho",
+      callbackURL: "https://yourapp.com/auth/callback",
+    });
+  };
+
+  const resendOtp = async () => {
+    const { error } = await client.auth.emailOtp.sendVerificationOtp({
+      email: email,
+      type: "sign-in",
+    });
+    if (error) {
+      setError("Could not send OTP");
+    }
   };
 
   return (
     <div>
       <div className="container">
         <div className="login_container">
+          <p className="login_title">Welcome back</p>
+          <p className="login_subtitle">Sign in to your account</p>
+
+          <div className="oauth_group">
+            <button type="button" className="oauth_btn" onClick={Google_OAuth}>
+              Sign in with Google
+            </button>
+            <button type="button" className="oauth_btn" onClick={Zoho_OAuth}>
+              Sign in with Zoho
+            </button>
+          </div>
+
+          <div className="divider">
+            <span>or</span>
+          </div>
+
           <input
-            placeholder="Enter Email"
+            placeholder="Email address"
             className="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
           <input
-            placeholder="Enter Password"
+            type="password"
+            placeholder="Password"
             className="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {error && (
-            <p
-              style={{
-                color: "#ff4444",
-                fontSize: "13px",
-                marginBottom: "8px",
-              }}
-            >
-              {error}
-            </p>
-          )}
-          <button type="submit" onClick={handleInitSubmit}>
+          {error && <p className="error_msg">{error}</p>}
+          <button type="button" onClick={handleInitSubmit} disabled={loading}>
             {loading
-              ? "processing request ..."
+              ? "Processing..."
               : showOtpScreen
-                ? "Resend Otp"
-                : "Login"}
+                ? "Resend OTP"
+                : "Sign in"}
           </button>
           <button
-            type="submit"
+            type="button"
             className="switch_btn"
             onClick={() => navigate("/SignUp")}
           >
-            switch to Sign Up
+            Don't have an account? Sign up
           </button>
           {showOtpScreen ? renderOtpRegion() : null}
         </div>

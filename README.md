@@ -1,6 +1,6 @@
 # React + Neon Auth Starter
 
-A minimal authentication boilerplate built with React and Neon's auth platform. Includes email/password sign up, OTP email verification, protected routes, and persistent session management.
+A minimal authentication boilerplate built with React and Neon's auth platform. Includes email/password sign up, OTP email verification, Google and Zoho OAuth, protected routes, and persistent session management.
 
 ## Stack
 
@@ -12,6 +12,7 @@ A minimal authentication boilerplate built with React and Neon's auth platform. 
 
 - Email + password sign up with OTP email verification
 - Email OTP login (two-step)
+- Google and Zoho OAuth (one-click sign in)
 - Protected routes
 - Persistent sessions across page refreshes
 - Single source of truth for auth state via React Context
@@ -36,10 +37,10 @@ A minimal authentication boilerplate built with React and Neon's auth platform. 
 │   │   ├── Home.css
 │   │   └── Home.jsx
 │   ├── lib
-│   │   ├── Auth.jsx           # Neon auth client instance
-│   │   ├── AuthContext.jsx    # React context + useAuth hook
-│   │   ├── AuthProvider.jsx   # Session fetching and state management
-│   │   ├── client.jsx         # Neon full client (auth + data API)
+│   │   ├── Auth.jsx
+│   │   ├── AuthContext.jsx
+│   │   ├── AuthProvider.jsx
+│   │   ├── client.jsx
 │   │   └── ProtectedRoutes.jsx
 │   ├── login
 │   │   ├── Login.css
@@ -87,6 +88,99 @@ const result = await client.dataApi.query(
 
 ---
 
+## OAuth Setup
+
+The project includes OAuth support for Google and Zoho out of the box. Both providers follow the same setup pattern.
+
+### Callback URL
+
+The `callbackURL` in `Login.jsx` and `SignUp.jsx` is set to a placeholder:
+
+```jsx
+callbackURL: "https://yourapp.com/auth/callback";
+```
+
+Update this to your actual domain in both files before deploying. In development you can use `http://localhost:5173/auth/callback` or wherever your dev server runs.
+
+---
+
+### Google OAuth
+
+#### 1. Create a Google OAuth app
+
+Go to [console.cloud.google.com](https://console.cloud.google.com) → create a new project or select an existing one.
+
+Navigate to **APIs & Services** → **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**.
+
+Set the application type to **Web application**.
+
+Under **Authorized redirect URIs**, add the URL your app redirects to after sign in — this is whatever you set as `callbackURL` in `Login.jsx` and `SignUp.jsx`. In development this is typically `http://localhost:5173/auth/callback`.
+
+#### 2. Get your credentials
+
+Copy the **Client ID** and **Client Secret** from the Google console.
+
+#### 3. Add Google as a provider in Neon
+
+In your Neon dashboard → **Auth** tab → **Social Providers** → enable **Google** → paste in your Client ID and Client Secret → save.
+
+---
+
+### Zoho OAuth
+
+#### 1. Create a Zoho OAuth app
+
+Go to [api-console.zoho.com](https://api-console.zoho.com) → **Add Client** → select **Server-based Applications**.
+
+Under **Authorized Redirect URIs**, add the URL your app redirects to after sign in — this is whatever you set as `callbackURL` in `Login.jsx` and `SignUp.jsx`. In development this is typically `http://localhost:5173/auth/callback`.
+
+#### 2. Get your credentials
+
+Copy the **Client ID** and **Client Secret** from the Zoho API console.
+
+#### 3. Add Zoho as a provider in Neon
+
+In your Neon dashboard → **Auth** tab → **Social Providers** → enable **Zoho** → paste in your Client ID and Client Secret → save.
+
+---
+
+### How OAuth works in this project
+
+When a user clicks **Sign in with Google** or **Sign in with Zoho**, Neon handles the full OAuth redirect flow. On success, Neon redirects the user back to your `callbackURL`. You need to handle that route in your app, call `refreshSession()`, and navigate the user to the appropriate page.
+
+A minimal callback handler looks like this:
+
+```jsx
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../lib/AuthContext.jsx";
+
+const AuthCallback = () => {
+  const { refreshSession } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const finish = async () => {
+      await refreshSession();
+      navigate("/Home");
+    };
+    finish();
+  }, []);
+
+  return <p>Signing you in...</p>;
+};
+
+export default AuthCallback;
+```
+
+Register this component as a route in `App.jsx` at whatever path you set as your `callbackURL`:
+
+```jsx
+<Route path="/auth/callback" element={<AuthCallback />} />
+```
+
+---
+
 ## Getting Started
 
 ### 1. Clone the repo
@@ -111,7 +205,15 @@ VITE_NEON_AUTH=your_neon_auth_url
 VITE_NEON_DATA_API=your_neon_data_api_url
 ```
 
-### 4. Run the dev server
+### 4. Update OAuth callback URLs
+
+In `src/login/Login.jsx` and `src/signUp/SignUp.jsx`, replace the placeholder `callbackURL` with your actual URL:
+
+```jsx
+callbackURL: "https://yourapp.com/auth/callback";
+```
+
+### 5. Run the dev server
 
 ```bash
 npm run dev
@@ -260,7 +362,7 @@ Same pattern on sign out:
 
 ```jsx
 await client.auth.signOut();
-await refreshSession(); // clears session and user in context
+await refreshSession();
 navigate("/Login");
 ```
 
@@ -270,7 +372,7 @@ navigate("/Login");
 
 **Sign Up**
 
-1. User enters email, password, and name
+1. User enters email and password
 2. Account is created via `client.auth.signUp.email()`
 3. OTP sent to email via `client.auth.emailOtp.sendVerificationOtp()`
 4. User enters OTP → verified via `client.auth.emailOtp.verifyEmail()`
@@ -282,6 +384,13 @@ navigate("/Login");
 2. OTP sent to email via `client.auth.emailOtp.sendVerificationOtp()`
 3. User enters OTP → verified via `client.auth.signIn.emailOtp()`
 4. `refreshSession()` called → session stored in context → redirect to Home
+
+**OAuth (Google / Zoho)**
+
+1. User clicks Sign in with Google or Sign in with Zoho
+2. Neon redirects the user to the provider's consent screen
+3. On approval, the provider redirects back to your `callbackURL`
+4. Your callback route calls `refreshSession()` → session stored in context → redirect to Home
 
 **On Page Refresh**
 

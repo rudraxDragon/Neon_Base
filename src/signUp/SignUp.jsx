@@ -10,12 +10,25 @@ const SignUp = () => {
   const [otp, setOtp] = useState("");
   const [showOtp, setShowOtp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const { refreshSession } = useAuth();
 
   const navigate = useNavigate();
 
   const handleInitSubmit = async () => {
+    setError("");
     setLoading(true);
+    if (!email || !password) {
+      setError("All fields are mandatory");
+      setLoading(false);
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Please enter a valid email");
+      setLoading(false);
+      return;
+    }
+
     const result = await client.auth.signUp.email({
       email: email,
       password: password,
@@ -23,73 +36,125 @@ const SignUp = () => {
     });
 
     if (result.error) {
-      console.log("ah man ... error log: ", result.error.message);
+      setError(result.error.message ?? "Sign up failed, please try again");
     } else {
       if (result.data?.user && !result.data.user.emailVerified) {
-        setShowOtp(true); // code already sent by Neon
+        setShowOtp(true);
       }
     }
     setLoading(false);
   };
 
   const handleOtpVerify = async () => {
-    if (!email || !password) {
-      console.log("add all feilds before you verify");
+    setError("");
+    if (!otp) {
+      setError("Please enter your OTP");
       return;
     }
+
     const { data, error } = await client.auth.emailOtp.verifyEmail({
       email: email,
       otp: otp,
     });
 
     if (error) {
-      console.log("otp verification failed , log : ", error);
+      setError("Incorrect OTP, please try again");
     } else {
       await refreshSession();
-      navigate("/Profile");
+      navigate("/Home");
+    }
+  };
+
+  const resendOtp = async () => {
+    setError("");
+    const { error } = await client.auth.emailOtp.sendVerificationOtp({
+      email: email,
+      type: "sign-in",
+    });
+
+    if (error) {
+      setError("Could not send OTP");
     }
   };
 
   const renderOtpRegion = () => {
     return (
-      <div className="otp-container">
-        <h1>Enter your otp here:</h1>
+      <div className="otp_section">
         <input
-          placeholder="Enter Otp"
-          className="opt_input"
+          placeholder="Enter OTP"
+          className="otp_input"
           value={otp}
           onChange={(e) => setOtp(e.target.value)}
         />
-        <button type="submit" onClick={handleOtpVerify}>
+        <button type="button" className="otp_btn" onClick={handleOtpVerify}>
           Verify
+        </button>
+        <button type="button" className="otp_resend" onClick={resendOtp}>
+          Resend OTP
         </button>
       </div>
     );
   };
 
+  const Google_OAuth = async () => {
+    await client.auth.signIn.social({
+      provider: "google",
+      callbackURL: "https://yourapp.com/auth/callback",
+    });
+  };
+
+  const Zoho_OAuth = async () => {
+    await client.auth.signIn.social({
+      provider: "zoho",
+      callbackURL: "https://yourapp.com/auth/callback",
+    });
+  };
+
   return (
     <div className="container">
       <div className="sign_up_container">
+        <p className="signup_title">Create an account</p>
+        <p className="signup_subtitle">Sign up to get started</p>
+
+        <div className="oauth_group">
+          <button type="button" className="oauth_btn" onClick={Google_OAuth}>
+            Sign up with Google
+          </button>
+          <button type="button" className="oauth_btn" onClick={Zoho_OAuth}>
+            Sign up with Zoho
+          </button>
+        </div>
+
+        <div className="divider">
+          <span>or</span>
+        </div>
+
         <input
-          placeholder="Enter Email"
+          placeholder="Email address"
           className="email_input"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
         <input
-          placeholder="Enter Password"
+          type="password"
+          placeholder="Password"
           className="password_input"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <button type="submit" disabled={loading} onClick={handleInitSubmit}>
-          {loading ? "wait ..." : "Sign Up"}
+        {error && <p className="error_msg">{error}</p>}
+        <button type="button" disabled={loading} onClick={handleInitSubmit}>
+          {loading ? "Processing..." : "Sign up"}
         </button>
-        {!showOtp ? null : renderOtpRegion()}
+        <button
+          type="button"
+          className="switch_btn"
+          onClick={() => navigate("/Login")}
+        >
+          Already have an account? Sign in
+        </button>
+        {showOtp ? renderOtpRegion() : null}
       </div>
-      <button type="submit" onClick={() => navigate("/Login")}>
-        switch to Login
-      </button>
     </div>
   );
 };
